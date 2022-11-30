@@ -227,11 +227,11 @@ func GetPinyinInitialRootNodeFromForest(farm *Forest, firstPinyin string) []*Tre
 func Traverse(node *TreeNode, prefix string) []string {
 	result := make([]string, 0)
 	if node.IsBlack && len(node.LeaveNodes) > 0 {
-		result = append(result, util.Concat(ReverseTraverse(node), ""))
+		result = append(result, prefix)
 	}
 
 	if len(node.LeaveNodes) < 1 {
-		result = append(result, util.Concat(ReverseTraverse(node), ""))
+		result = append(result, prefix)
 	}
 
 	for _, leave := range node.LeaveNodes {

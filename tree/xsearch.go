@@ -4,6 +4,7 @@ import (
 	"github.com/chrwhy/open-pinyin/parser"
 	"log"
 	"sstree/util"
+	"time"
 	"unicode"
 )
 
@@ -122,17 +123,26 @@ func XSearch(forest *Forest, input string) []string {
 			candidates = tempCandidates
 		}
 	}
-	duplicateChecker := make(map[*TreeNode]*TreeNode)
+	candidateParentChecker := make(map[*TreeNode]string)
+	t0 := time.Now()
 	if len(candidates) > 0 {
+		log.Println("candidate len:", len(candidates))
 		for _, candidate := range candidates {
-			if _, ok := duplicateChecker[candidate]; ok {
-				continue
+			suggestions := make([]string, 0)
+			if nil != candidate.Parent {
+				parentPath, ok := candidateParentChecker[candidate]
+				if !ok {
+					parentPath = util.Concat(ReverseTraverse(candidate), "")
+					candidateParentChecker[candidate.Parent] = parentPath
+				}
+				suggestions = Traverse(candidate, parentPath)
+			} else {
+				suggestions = Traverse(candidate, "")
 			}
-			duplicateChecker[candidate] = candidate
-			suggestions := Traverse(candidate, util.Concat(ReverseTraverse(candidate), ""))
 			finalResult = append(finalResult, suggestions...)
 		}
 	}
+	log.Println("Traverse cost:", time.Since(t0))
 
 	return finalResult
 }
@@ -152,10 +162,12 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 		internalXSearchResult := XCnPinyinSearch(forest, root, input)
 
 		finalResult := make([]*TreeNode, 0)
+		finalResultChecker := make(map[*TreeNode]string)
 		if len(internalXSearchResult) > 0 {
 			for _, internalXSearchCandidate := range internalXSearchResult {
 				log.Println("internalXSearch stop at: ", internalXSearchCandidate.Node.Data)
 				finalResult = append(finalResult, internalXSearchCandidate.Node)
+				finalResultChecker[internalXSearchCandidate.Node] = "1"
 			}
 			//return finalResult
 		}
@@ -173,7 +185,9 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 				for _, candidate := range candidates {
 					purePinyinSearchCandidates := XPinyinSearchV2(forest, candidate, "", pinyinGroup[1:])
 					for _, purePinyinSearchCandidate := range purePinyinSearchCandidates {
-						finalResult = append(finalResult, purePinyinSearchCandidate.Node)
+						if _, kk := finalResultChecker[purePinyinSearchCandidate.Node]; !kk {
+							finalResult = append(finalResult, purePinyinSearchCandidate.Node)
+						}
 					}
 				}
 			}
