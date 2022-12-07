@@ -123,22 +123,25 @@ func XSearch(forest *Forest, input string) []string {
 			candidates = tempCandidates
 		}
 	}
-	candidateParentChecker := make(map[*TreeNode]string)
+
+	candidateChecker := make(map[*TreeNode]string)
 	t0 := time.Now()
 	if len(candidates) > 0 {
 		log.Println("candidate len:", len(candidates))
 		for _, candidate := range candidates {
+			parentPath, ok := candidateChecker[candidate]
+			if ok {
+				continue
+			}
 			suggestions := make([]string, 0)
 			if nil != candidate.Parent {
-				parentPath, ok := candidateParentChecker[candidate]
-				if !ok {
-					parentPath = util.Concat(ReverseTraverse(candidate), "")
-					candidateParentChecker[candidate.Parent] = parentPath
-				}
-				suggestions = Traverse(candidate, parentPath)
+				parentPath = util.Concat(ReverseTraverse(candidate), "")
 			} else {
-				suggestions = Traverse(candidate, "")
+				parentPath = candidate.Data
 			}
+
+			candidateChecker[candidate] = parentPath
+			suggestions = Traverse(candidate, parentPath)
 			finalResult = append(finalResult, suggestions...)
 		}
 	}
