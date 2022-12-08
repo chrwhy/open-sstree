@@ -3,6 +3,7 @@ package sstree
 import (
 	"github.com/chrwhy/open-pinyin/parser"
 	"log"
+	"os"
 	"sstree/util"
 	"time"
 	"unicode"
@@ -126,8 +127,9 @@ func XSearch(forest *Forest, input string) []string {
 
 	candidateChecker := make(map[*TreeNode]string)
 	t0 := time.Now()
+	log.SetOutput(os.Stderr)
+	log.Println("candidate len:", len(candidates))
 	if len(candidates) > 0 {
-		log.Println("candidate len:", len(candidates))
 		for _, candidate := range candidates {
 			parentPath, ok := candidateChecker[candidate]
 			if ok {
@@ -204,7 +206,7 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 			if root == nil {
 				initialRoots = GetPinyinPrefixRootNodeFromForest(forest, initials[0])
 				if len(initialRoots) == 0 {
-					return nil
+					return finalResult
 				}
 				leftInitials = initials[1:]
 			} else {

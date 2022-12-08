@@ -62,8 +62,6 @@ func web() {
 		keyword, _ := c.GetQuery("keyword")
 		keyword = strings.ToLower(keyword)
 		cate, _ := c.GetQuery("cate")
-		log.Println(keyword)
-		log.Println(cate)
 		if len(cate) == 0 {
 			cate = "default"
 		}

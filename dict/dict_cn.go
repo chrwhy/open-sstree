@@ -11,7 +11,7 @@ import (
 )
 
 const WORDS_MIN_LEN = 2
-const MAX_LINE = 5000000
+const MAX_LINE = 2000000
 
 type Sentence struct {
 	Words []string
@@ -55,11 +55,11 @@ func LoadSentences(fileName string) []Sentence {
 		if len([]rune(sentence)) > 30 || len([]rune(sentence)) < WORDS_MIN_LEN {
 			continue
 		}
-		counter++
 		if _, ok := sentencesDuplicateChecker[strings.TrimSpace(sentence)]; ok {
 			continue
 		}
 
+		counter++
 		sentence = StripLine([]rune(sentence))
 		score := 0
 		if strings.Contains(sentence, "@") {
