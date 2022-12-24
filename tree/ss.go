@@ -36,15 +36,13 @@ func MultiLoad() {
 	}
 }
 
-func Search(cate, keyword string) []string {
+func Search(cate, keyword string) []*TreeNode {
 	keyword = PreProcess(keyword)
 	if len(keyword) < 1 {
-		return []string{}
+		return []*TreeNode{}
 	}
 	log.SetFlags(log.Ldate | log.Ltime | log.Llongfile)
 	//log.SetOutput(io.Discard)
-	finalResult := make([]string, 0)
 	//finalResult = V1Search(keyword)
-	finalResult = XSearch(MyForests[cate], keyword)
-	return finalResult
+	return XSearch(MyForests[cate], keyword)
 }

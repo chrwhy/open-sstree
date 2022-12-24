@@ -100,8 +100,7 @@ func XPinyinSearchV2(forest *Forest, root *TreeNode, leftover string, parsedPiny
 	return result
 }
 
-func XSearch(forest *Forest, input string) []string {
-	finalResult := make([]string, 0)
+func XSearch(forest *Forest, input string) []*TreeNode {
 	tokens := util.Tokenize([]rune(input))
 	candidates := internalXSearch(forest, nil, []rune(tokens[0]))
 	if len(candidates) == 0 {
@@ -125,31 +124,7 @@ func XSearch(forest *Forest, input string) []string {
 		}
 	}
 
-	candidateChecker := make(map[*TreeNode]string)
-	t0 := time.Now()
-	log.SetOutput(os.Stderr)
-	log.Println("candidate len:", len(candidates))
-	if len(candidates) > 0 {
-		for _, candidate := range candidates {
-			parentPath, ok := candidateChecker[candidate]
-			if ok {
-				continue
-			}
-			suggestions := make([]string, 0)
-			if nil != candidate.Parent {
-				parentPath = util.Concat(ReverseTraverse(candidate), "")
-			} else {
-				parentPath = candidate.Data
-			}
-
-			candidateChecker[candidate] = parentPath
-			suggestions = Traverse(candidate, parentPath)
-			finalResult = append(finalResult, suggestions...)
-		}
-	}
-	log.Println("Traverse cost:", time.Since(t0))
-
-	return finalResult
+	return candidates
 }
 
 func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
@@ -227,6 +202,34 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 
 		return finalResult
 	}
+}
+
+func XTraverse(candidates []*TreeNode) []string {
+	finalResult := make([]string, 0)
+	candidateChecker := make(map[*TreeNode]string)
+	t0 := time.Now()
+	log.SetOutput(os.Stderr)
+	log.Println("candidate len:", len(candidates))
+	if len(candidates) > 0 {
+		for _, candidate := range candidates {
+			parentPath, ok := candidateChecker[candidate]
+			if ok {
+				continue
+			}
+			suggestions := make([]string, 0)
+			if nil != candidate.Parent {
+				parentPath = util.Concat(ReverseTraverse(candidate), "")
+			} else {
+				parentPath = candidate.Data
+			}
+
+			candidateChecker[candidate] = parentPath
+			suggestions = Traverse(candidate, parentPath)
+			finalResult = append(finalResult, suggestions...)
+		}
+	}
+	log.Println("Traverse cost:", time.Since(t0))
+	return finalResult
 }
 
 func XCnSearch(forest *Forest, root *TreeNode, input []rune) (*TreeNode, []rune) {

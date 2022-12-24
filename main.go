@@ -32,12 +32,16 @@ func local() {
 
 		t0 := time.Now()
 		log.SetOutput(io.Discard)
-		suggestions := sstree.Search(sstree.DEFAULT_FOREST, keyword)
+		candidates := sstree.Search(sstree.DEFAULT_FOREST, keyword)
 		t1 := time.Now()
 		log.SetOutput(os.Stderr)
 		log.SetFlags(0)
-		sstree.PrintSuggestions(suggestions)
 		log.Println("Search cost:", t1.Sub(t0))
+		suggestions := sstree.XTraverse(candidates)
+		log.Println("Suggestions len:", len(suggestions))
+		sstree.PrintSuggestions(suggestions)
+		t2 := time.Now()
+		log.Println("Total cost:", t2.Sub(t0))
 	}
 }
 
