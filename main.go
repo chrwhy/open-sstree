@@ -79,16 +79,24 @@ func web() {
 		log.SetOutput(os.Stderr)
 		log.Println("Search cost:", t1.Sub(t0))
 		log.Println("Total records: ", len(result))
+		suggestions := make([]string, 0)
+		if len(result) > 100 {
+			suggestions = sstree.XTraverse(result[0:100])
+			log.Println("Suggestions len:", len(suggestions))
+		} else {
+			suggestions = sstree.XTraverse(result)
+			log.Println("Suggestions len:", len(suggestions))
+		}
 
 		if len(result) > 100 {
 			c.JSON(http.StatusOK, gin.H{
 				"search_type": "",
-				"result":      result[0:100],
+				"result":      suggestions,
 			})
 		} else {
 			c.JSON(http.StatusOK, gin.H{
 				"search_type": "",
-				"result":      result,
+				"result":      suggestions,
 			})
 		}
 	})

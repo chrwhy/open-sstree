@@ -17,8 +17,13 @@ func PreProcess(input string) string {
 
 func PrintSuggestions(suggestions []string) {
 	checker := make(map[string]string)
+	count := 0
 	for _, suggestion := range suggestions {
 		if _, ok := checker[suggestion]; !ok {
+			if count >= 20 {
+				//break
+			}
+			count = count + 1
 			log.Println("建议:", suggestion)
 			//checker[suggestion] = "1"
 		}
