@@ -192,6 +192,21 @@ func GetPinyinRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
 	return foundNodes
 }
 
+func GetPinyinPrefixRootNodeFromNode(node *TreeNode, firstPinyin string) []*TreeNode {
+	log.Println("GetPinyinPrefixRootNodeFromForest first pinyin: ", firstPinyin)
+	candidates := node.LeaveNodes
+	result := make([]*TreeNode, 0)
+	for _, candidate := range candidates {
+		for _, pinyin := range candidate.PinyinData {
+			if strings.HasPrefix(pinyin, firstPinyin) {
+				result = append(result, candidate)
+			}
+		}
+	}
+
+	return result
+}
+
 func GetPinyinPrefixRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
 	log.Println("GetPinyinPrefixRootNodeFromForest first pinyin: ", firstPinyin)
 	candidates := GetPinyinInitialRootNodeFromForest(farm, firstPinyin)

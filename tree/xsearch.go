@@ -152,6 +152,10 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 			//return finalResult
 		}
 
+		if root != nil && len(internalXSearchResult) == 0 {
+			//return nil
+		}
+
 		pinyinGroups := ParsePinyin(string(input))
 		if len(pinyinGroups) > 0 {
 			log.Println("Going to try pure pinyin search: ", input)
@@ -159,7 +163,11 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 			for _, pinyinGroup := range pinyinGroups {
 				candidates, ok := tempCache[pinyinGroup[0]]
 				if !ok {
-					candidates = GetPinyinPrefixRootNodeFromForest(forest, pinyinGroup[0])
+					if root == nil {
+						candidates = GetPinyinPrefixRootNodeFromForest(forest, pinyinGroup[0])
+					} else {
+						candidates = GetPinyinPrefixRootNodeFromNode(root, pinyinGroup[0])
+					}
 					tempCache[pinyinGroup[0]] = candidates
 				}
 				for _, candidate := range candidates {
