@@ -166,7 +166,7 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 					if root == nil {
 						candidates = GetPinyinPrefixRootNodeFromForest(forest, pinyinGroup[0])
 					} else {
-						candidates = GetPinyinPrefixRootNodeFromNode(root, pinyinGroup[0])
+						candidates = GetPinyinPrefixNodeFromNode(root, pinyinGroup[0])
 					}
 					tempCache[pinyinGroup[0]] = candidates
 				}

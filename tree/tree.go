@@ -192,7 +192,7 @@ func GetPinyinRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
 	return foundNodes
 }
 
-func GetPinyinPrefixRootNodeFromNode(node *TreeNode, firstPinyin string) []*TreeNode {
+func GetPinyinPrefixNodeFromNode(node *TreeNode, firstPinyin string) []*TreeNode {
 	log.Println("GetPinyinPrefixRootNodeFromForest first pinyin: ", firstPinyin)
 	candidates := node.LeaveNodes
 	result := make([]*TreeNode, 0)
