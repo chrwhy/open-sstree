@@ -52,6 +52,7 @@ func LoadSentences(fileName string) []Sentence {
 	counter := 0
 	for scanner.Scan() {
 		sentence := scanner.Text()
+		sentence = strings.ToLower(sentence)
 		if len([]rune(sentence)) > 30 || len([]rune(sentence)) < WORDS_MIN_LEN {
 			continue
 		}

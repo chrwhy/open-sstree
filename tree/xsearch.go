@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sstree/util"
+	"strings"
 	"time"
 	"unicode"
 )
@@ -101,7 +102,7 @@ func XPinyinSearchV2(forest *Forest, root *TreeNode, leftover string, parsedPiny
 }
 
 func XSearch(forest *Forest, input string) []*TreeNode {
-	tokens := util.Tokenize([]rune(input))
+	tokens := util.Tokenize([]rune(strings.ToLower(input)))
 	candidates := internalXSearch(forest, nil, []rune(tokens[0]))
 	if len(candidates) == 0 {
 		return nil

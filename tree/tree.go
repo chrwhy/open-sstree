@@ -133,24 +133,6 @@ func internalBuildTree(current *TreeNode, input []string, score int) {
 	}
 }
 
-func CnSearch(node *TreeNode, input []string) *TreeNode {
-	if node == nil {
-		return nil
-	}
-
-	if len(input) == 0 {
-		return node
-	}
-
-	head := input[0]
-	if slot, ok := node.CnSlot[head]; ok {
-		leave := node.LeaveNodes[util.Str2Int(slot)]
-		return CnSearch(leave, input[1:])
-	}
-
-	return node
-}
-
 func CnSearchV2(node *TreeNode, input []rune) (*TreeNode, []rune) {
 	if node == nil {
 		return nil, input
@@ -275,57 +257,6 @@ func ReverseTraverse(node *TreeNode) []string {
 
 	util.Reverse(&result)
 	return result
-}
-
-func PinyinSearch(found *TreeNode, input []string, initial bool) []*TreeNode {
-	result := make([]*TreeNode, 0)
-	if len(input) < 1 {
-		return []*TreeNode{found}
-	}
-
-	if len(found.LeaveNodes) < 1 {
-		log.Println("no leave nodes")
-		return []*TreeNode{found}
-	} else {
-		head := input[0]
-		var slots []string
-		if initial || len(input) == 1 {
-			slots = found.PinyinInitialSlot[head[0:1]]
-		} else {
-			slots = found.PinyinSlot[head]
-		}
-		checker := make(map[string]string)
-		for _, slot := range slots {
-			if _, ok := checker[slot]; ok {
-				//multiple pinyin case
-				continue
-			}
-			checker[slot] = slot
-			slotNode := found.LeaveNodes[util.Str2Int(slot)]
-			for _, pinyin := range slotNode.PinyinData {
-				compareTo := head
-				if initial {
-					compareTo = compareTo[0:1]
-					pinyin = pinyin[0:1]
-				}
-				if len(input) == 1 {
-					if strings.HasPrefix(pinyin, compareTo) {
-						result = append(result, PinyinSearch(slotNode, input[1:], initial)...)
-						break
-					}
-				} else {
-					if pinyin == compareTo {
-						result = append(result, PinyinSearch(slotNode, input[1:], initial)...)
-						break
-					}
-				}
-			}
-		}
-		if len(result) < 1 {
-			return []*TreeNode{found}
-		}
-		return result
-	}
 }
 
 type PinyinSearchV3Result struct {
