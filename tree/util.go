@@ -12,7 +12,7 @@ func ParsePinyin(text string) [][]string {
 }
 
 func PreProcess(input string) string {
-	return strings.Replace(strings.TrimSpace(input), "'", "", -1)
+	return strings.ToLower(strings.Replace(strings.TrimSpace(input), "'", "", -1))
 }
 
 func PrintSuggestions(suggestions []string) {
