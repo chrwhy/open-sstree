@@ -1,4 +1,4 @@
-module sstree
+module github.com/chrwhy/open-sstree
 
 go 1.15
 
