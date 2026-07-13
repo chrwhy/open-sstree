@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sstree/util"
+	"github.com/chrwhy/open-sstree/util"
 	"strings"
 	"time"
 )

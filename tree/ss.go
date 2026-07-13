@@ -3,7 +3,7 @@ package sstree
 import (
 	"log"
 	"os"
-	"sstree/dict"
+	"github.com/chrwhy/open-sstree/dict"
 	"strings"
 	"time"
 )
