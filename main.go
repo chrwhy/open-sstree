@@ -8,7 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sstree/tree"
+	"github.com/chrwhy/open-sstree/tree"
 	"strings"
 	"time"
 )

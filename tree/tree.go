@@ -3,8 +3,8 @@ package sstree
 import (
 	pydict "github.com/chrwhy/open-pinyin/dict"
 	"log"
-	"sstree/dict"
-	"sstree/util"
+	"github.com/chrwhy/open-sstree/dict"
+	"github.com/chrwhy/open-sstree/util"
 	"strings"
 	"time"
 )
