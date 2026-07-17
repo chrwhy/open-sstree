@@ -3,11 +3,12 @@ package dict
 import (
 	"bufio"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
-	"github.com/chrwhy/open-sstree/util"
 	"strings"
 	"time"
+
+	"github.com/chrwhy/open-sstree/util"
 )
 
 const WORDS_MIN_LEN = 2
@@ -38,12 +39,12 @@ func StripLine(word []rune) string {
 	return strippedLine
 }
 
-func LoadSentences(fileName string) []Sentence {
+func LoadSentences(fileName string) ([]Sentence, error) {
 	Sentences := make([]Sentence, 0)
 	t0 := time.Now()
 	file, err := os.Open(fileName)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("open dict file %s: %w", fileName, err)
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
@@ -64,14 +65,20 @@ func LoadSentences(fileName string) []Sentence {
 		sentence = StripLine([]rune(sentence))
 		score := 0
 		if strings.Contains(sentence, "@") {
-			score = util.Str2Int(strings.Split(sentence, "@")[1])
+			scoreStr := strings.Split(sentence, "@")[1]
+			s, err := util.Str2Int(scoreStr)
+			if err != nil {
+				slog.Warn("invalid score in dict, using 0", "file", fileName, "value", scoreStr, "error", err)
+			} else {
+				score = s
+			}
 			sentence = strings.Split(sentence, "@")[0]
 		}
 		score++
 		sentencesDuplicateChecker[sentence] = "1"
 
 		singleCnWordArray := []rune(sentence)
-		cnLineArray := make([]string, 0)
+		cnLineArray := make([]string, 0, len(singleCnWordArray))
 		for _, tp := range singleCnWordArray {
 			cnLineArray = append(cnLineArray, string(tp))
 		}
@@ -83,9 +90,13 @@ func LoadSentences(fileName string) []Sentence {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("reading dict file %s: %w", fileName, err)
+	}
+
 	fmt.Println("共加载了", counter, "组中文词条")
 	fmt.Println("有效词条", len(sentencesDuplicateChecker))
 	fmt.Println("其中", counter-len(sentencesDuplicateChecker), "组重复的词条")
 	fmt.Println("Load cost: ", time.Since(t0))
-	return Sentences
+	return Sentences, nil
 }

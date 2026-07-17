@@ -1,31 +1,34 @@
 package sstree
 
 import (
-	"github.com/chrwhy/open-pinyin/parser"
-	"log"
+	"log/slog"
 	"strings"
+
+	"github.com/chrwhy/open-pinyin/parser"
 )
 
 func ParsePinyin(text string) [][]string {
 	return parser.Parse(text)
-	//return [][]string{parser.GreedyParse(text)}
 }
 
 func PreProcess(input string) string {
 	return strings.ToLower(strings.Replace(strings.TrimSpace(input), "'", "", -1))
 }
 
-func PrintSuggestions(suggestions []string) {
-	checker := make(map[string]string)
+// PrintSuggestions prints unique suggestions up to maxResults.
+// Returns the number of unique suggestions printed.
+func PrintSuggestions(suggestions []string) int {
+	checker := make(map[string]bool)
 	count := 0
 	for _, suggestion := range suggestions {
-		if _, ok := checker[suggestion]; !ok {
+		if !checker[suggestion] {
 			if count >= 20 {
-				//break
+				break
 			}
-			count = count + 1
-			log.Println("建议:", suggestion)
-			//checker[suggestion] = "1"
+			checker[suggestion] = true
+			count++
+			slog.Info("建议", "suggestion", suggestion)
 		}
 	}
+	return count
 }
