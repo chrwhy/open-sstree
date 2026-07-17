@@ -1,39 +1,40 @@
 package sstree
 
 import (
-	pydict "github.com/chrwhy/open-pinyin/dict"
-	"log"
-	"github.com/chrwhy/open-sstree/dict"
-	"github.com/chrwhy/open-sstree/util"
+	"log/slog"
 	"strings"
 	"time"
+
+	pydict "github.com/chrwhy/open-pinyin/dict"
+
+	"github.com/chrwhy/open-sstree/dict"
 )
 
 type TreeNode struct {
 	Data              string
 	PinyinData        []string
-	LeaveNodes        []*TreeNode
+	LeafNodes         []*TreeNode
 	Parent            *TreeNode
-	CnSlot            map[string]string
-	PinyinSlot        map[string][]string
-	PinyinInitialSlot map[string][]string
+	CnSlot            map[string]int
+	PinyinSlot        map[string][]int
+	PinyinInitialSlot map[string][]int
 	IsBlack           bool
 	Score             int
 }
 
 type Forest struct {
 	Trees             []*TreeNode
-	PinyinSlot        map[string][]string
-	PinyinInitialSlot map[string][]string
-	CnSlot            map[string]string
+	PinyinSlot        map[string][]int
+	PinyinInitialSlot map[string][]int
+	CnSlot            map[string]int
 }
 
 func BuildForest(input []dict.Sentence) *Forest {
 	t0 := time.Now()
 	myForest := Forest{}
-	myForest.PinyinSlot = make(map[string][]string)
-	myForest.CnSlot = make(map[string]string)
-	myForest.PinyinInitialSlot = make(map[string][]string)
+	myForest.PinyinSlot = make(map[string][]int)
+	myForest.CnSlot = make(map[string]int)
+	myForest.PinyinInitialSlot = make(map[string][]int)
 
 	for _, word := range input {
 		if len(word.Words) < 1 {
@@ -45,8 +46,8 @@ func BuildForest(input []dict.Sentence) *Forest {
 		}
 
 		var myTreeRoot *TreeNode
-		if myForest.CnSlot[treeRootName] != "" {
-			myTreeRoot = myForest.Trees[util.Str2Int(myForest.CnSlot[treeRootName])]
+		if idx, ok := myForest.CnSlot[treeRootName]; ok {
+			myTreeRoot = myForest.Trees[idx]
 		}
 
 		if myTreeRoot != nil {
@@ -56,23 +57,27 @@ func BuildForest(input []dict.Sentence) *Forest {
 			internalBuildTree(myTreeRoot, word.Words[1:], word.Score)
 		} else {
 			myTreeRoot = &TreeNode{}
-			myTreeRoot.CnSlot = make(map[string]string)
-			myTreeRoot.PinyinInitialSlot = make(map[string][]string)
-			myTreeRoot.PinyinSlot = make(map[string][]string)
+			myTreeRoot.CnSlot = make(map[string]int)
+			myTreeRoot.PinyinInitialSlot = make(map[string][]int)
+			myTreeRoot.PinyinSlot = make(map[string][]int)
 			myTreeRoot.Data = treeRootName
 			myTreeRoot.IsBlack = false
 			myTreeRoot.PinyinData = pydict.GetCnPinyin(treeRootName)
-			myForest.CnSlot[treeRootName] = util.Int2Str(len(myForest.Trees))
+			treeIdx := len(myForest.Trees)
+			myForest.CnSlot[treeRootName] = treeIdx
 			for _, pinyin := range myTreeRoot.PinyinData {
-				myForest.PinyinSlot[pinyin] = append(myForest.PinyinSlot[pinyin], util.Int2Str(len(myForest.Trees)))
-				myForest.PinyinInitialSlot[pinyin[0:1]] = append(myForest.PinyinInitialSlot[pinyin[0:1]], util.Int2Str(len(myForest.Trees)))
+				if len(pinyin) == 0 {
+					continue
+				}
+				myForest.PinyinSlot[pinyin] = append(myForest.PinyinSlot[pinyin], treeIdx)
+				myForest.PinyinInitialSlot[pinyin[0:1]] = append(myForest.PinyinInitialSlot[pinyin[0:1]], treeIdx)
 			}
 			myForest.Trees = append(myForest.Trees, myTreeRoot)
 			myTreeRoot.Score = word.Score
 			internalBuildTree(myTreeRoot, word.Words[1:], word.Score)
 		}
 	}
-	log.Println("Build forest cost: ", time.Now().Sub(t0))
+	slog.Info("Build forest", "cost", time.Since(t0), "trees", len(myForest.Trees))
 	return &myForest
 }
 
@@ -83,28 +88,31 @@ func internalBuildTree(current *TreeNode, input []string, score int) {
 		return
 	}
 
-	if len(current.LeaveNodes) < 1 {
-		current.LeaveNodes = make([]*TreeNode, 0)
+	if len(current.LeafNodes) < 1 {
+		current.LeafNodes = make([]*TreeNode, 0)
 		newNode := &TreeNode{Data: input[0]}
 		newNode.PinyinData = pydict.GetCnPinyin(newNode.Data)
 		newNode.Parent = current
 		newNode.IsBlack = false
-		newNode.CnSlot = make(map[string]string)
-		newNode.PinyinSlot = make(map[string][]string)
-		newNode.PinyinInitialSlot = make(map[string][]string)
+		newNode.CnSlot = make(map[string]int)
+		newNode.PinyinSlot = make(map[string][]int)
+		newNode.PinyinInitialSlot = make(map[string][]int)
 		newNode.Score = score
-		current.CnSlot[input[0]] = "0"
+		current.CnSlot[input[0]] = 0
 
 		for _, pinyin := range newNode.PinyinData {
-			current.PinyinSlot[pinyin] = []string{"0"}
-			current.PinyinInitialSlot[pinyin[0:1]] = append(current.PinyinInitialSlot[pinyin[0:1]], "0")
+			if len(pinyin) == 0 {
+				continue
+			}
+			current.PinyinSlot[pinyin] = []int{0}
+			current.PinyinInitialSlot[pinyin[0:1]] = append(current.PinyinInitialSlot[pinyin[0:1]], 0)
 		}
-		current.LeaveNodes = append(current.LeaveNodes, newNode)
+		current.LeafNodes = append(current.LeafNodes, newNode)
 		internalBuildTree(newNode, input[1:], score)
 	} else {
 		var found *TreeNode
-		if _, ok := current.CnSlot[input[0]]; ok {
-			found = current.LeaveNodes[util.Str2Int(current.CnSlot[input[0]])]
+		if idx, ok := current.CnSlot[input[0]]; ok {
+			found = current.LeafNodes[idx]
 		}
 
 		if found == nil {
@@ -112,17 +120,21 @@ func internalBuildTree(current *TreeNode, input []string, score int) {
 			newNode.PinyinData = pydict.GetCnPinyin(newNode.Data)
 			newNode.Parent = current
 			newNode.IsBlack = false
-			newNode.PinyinSlot = make(map[string][]string)
-			newNode.PinyinInitialSlot = make(map[string][]string)
-			newNode.CnSlot = make(map[string]string)
+			newNode.PinyinSlot = make(map[string][]int)
+			newNode.PinyinInitialSlot = make(map[string][]int)
+			newNode.CnSlot = make(map[string]int)
 			newNode.Score = score
 
-			current.CnSlot[input[0]] = util.Int2Str(len(current.LeaveNodes))
+			childIdx := len(current.LeafNodes)
+			current.CnSlot[input[0]] = childIdx
 			for _, pinyin := range newNode.PinyinData {
-				current.PinyinSlot[pinyin] = append(current.PinyinSlot[pinyin], util.Int2Str(len(current.LeaveNodes)))
-				current.PinyinInitialSlot[pinyin[0:1]] = append(current.PinyinInitialSlot[pinyin[0:1]], util.Int2Str(len(current.LeaveNodes)))
+				if len(pinyin) == 0 {
+					continue
+				}
+				current.PinyinSlot[pinyin] = append(current.PinyinSlot[pinyin], childIdx)
+				current.PinyinInitialSlot[pinyin[0:1]] = append(current.PinyinInitialSlot[pinyin[0:1]], childIdx)
 			}
-			current.LeaveNodes = append(current.LeaveNodes, newNode)
+			current.LeafNodes = append(current.LeafNodes, newNode)
 			internalBuildTree(newNode, input[1:], score)
 		} else {
 			if score > found.Score {
@@ -133,7 +145,7 @@ func internalBuildTree(current *TreeNode, input []string, score int) {
 	}
 }
 
-func CnSearchV2(node *TreeNode, input []rune) (*TreeNode, []rune) {
+func CnSearch(node *TreeNode, input []rune) (*TreeNode, []rune) {
 	if node == nil {
 		return nil, input
 	}
@@ -143,17 +155,20 @@ func CnSearchV2(node *TreeNode, input []rune) (*TreeNode, []rune) {
 	}
 
 	head := string(input[0:1])
-	if slot, ok := node.CnSlot[head]; ok {
-		leave := node.LeaveNodes[util.Str2Int(slot)]
-		return CnSearchV2(leave, input[1:])
+	if idx, ok := node.CnSlot[head]; ok {
+		leaf := node.LeafNodes[idx]
+		return CnSearch(leaf, input[1:])
 	}
 
 	return node, input
 }
 
 func GetRootNodeFromForest(farm *Forest, input string) *TreeNode {
-	if len(farm.CnSlot[input]) > 0 {
-		return farm.Trees[util.Str2Int(farm.CnSlot[input])]
+	if farm == nil {
+		return nil
+	}
+	if idx, ok := farm.CnSlot[input]; ok {
+		return farm.Trees[idx]
 	}
 	return nil
 }
@@ -163,7 +178,7 @@ func GetPinyinRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
 	slots := farm.PinyinSlot[firstPinyin]
 
 	for _, slot := range slots {
-		slotNode := farm.Trees[util.Str2Int(slot)]
+		slotNode := farm.Trees[slot]
 		for _, pinyin := range slotNode.PinyinData {
 			if pinyin == firstPinyin {
 				foundNodes = append(foundNodes, slotNode)
@@ -175,8 +190,8 @@ func GetPinyinRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
 }
 
 func GetPinyinPrefixNodeFromNode(node *TreeNode, firstPinyin string) []*TreeNode {
-	log.Println("GetPinyinPrefixRootNodeFromForest first pinyin: ", firstPinyin)
-	candidates := node.LeaveNodes
+	slog.Debug("GetPinyinPrefixNodeFromNode", "firstPinyin", firstPinyin)
+	candidates := node.LeafNodes
 	result := make([]*TreeNode, 0)
 	for _, candidate := range candidates {
 		for _, pinyin := range candidate.PinyinData {
@@ -190,7 +205,7 @@ func GetPinyinPrefixNodeFromNode(node *TreeNode, firstPinyin string) []*TreeNode
 }
 
 func GetPinyinPrefixRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
-	log.Println("GetPinyinPrefixRootNodeFromForest first pinyin: ", firstPinyin)
+	slog.Debug("GetPinyinPrefixRootNodeFromForest", "firstPinyin", firstPinyin)
 	candidates := GetPinyinInitialRootNodeFromForest(farm, firstPinyin)
 	result := make([]*TreeNode, 0)
 	for _, candidate := range candidates {
@@ -206,12 +221,15 @@ func GetPinyinPrefixRootNodeFromForest(farm *Forest, firstPinyin string) []*Tree
 
 func GetPinyinInitialRootNodeFromForest(farm *Forest, firstPinyin string) []*TreeNode {
 	foundNodes := make([]*TreeNode, 0)
+	if len(firstPinyin) == 0 {
+		return foundNodes
+	}
 	initial := firstPinyin[0:1]
 	slots := farm.PinyinInitialSlot[initial]
 	for _, slot := range slots {
-		slotNode := farm.Trees[util.Str2Int(slot)]
+		slotNode := farm.Trees[slot]
 		for _, pinyin := range slotNode.PinyinData {
-			if pinyin[0:1] == initial {
+			if len(pinyin) > 0 && pinyin[0:1] == initial {
 				foundNodes = append(foundNodes, slotNode)
 				break
 			}
@@ -223,16 +241,16 @@ func GetPinyinInitialRootNodeFromForest(farm *Forest, firstPinyin string) []*Tre
 
 func Traverse(node *TreeNode, prefix string) []string {
 	result := make([]string, 0)
-	if node.IsBlack && len(node.LeaveNodes) > 0 {
+	if node.IsBlack && len(node.LeafNodes) > 0 {
 		result = append(result, prefix)
 	}
 
-	if len(node.LeaveNodes) < 1 {
+	if len(node.LeafNodes) < 1 {
 		result = append(result, prefix)
 	}
 
-	for _, leave := range node.LeaveNodes {
-		result = append(result, Traverse(leave, prefix+leave.Data)...)
+	for _, leaf := range node.LeafNodes {
+		result = append(result, Traverse(leaf, prefix+leaf.Data)...)
 	}
 
 	return result
@@ -245,64 +263,78 @@ func ReverseTraverse(node *TreeNode) []string {
 	result := make([]string, 0)
 	for {
 		if node.Parent != nil {
-			//log.Println(node.Data)
 			result = append(result, node.Data)
 			node = node.Parent
 		} else {
-			//log.Println(node.Data)
 			result = append(result, node.Data)
 			break
 		}
 	}
 
-	util.Reverse(&result)
+	ReverseStrings(&result)
 	return result
 }
 
-type PinyinSearchV3Result struct {
+// ReverseStrings reverses a string slice in place.
+func ReverseStrings(arr *[]string) {
+	var temp string
+	length := len(*arr)
+	for i := 0; i < length/2; i++ {
+		temp = (*arr)[i]
+		(*arr)[i] = (*arr)[length-1-i]
+		(*arr)[length-1-i] = temp
+	}
+}
+
+type PinyinSearchResult struct {
 	Node     *TreeNode
 	Leftover []string
 }
 
-func PinyinSearchV2(found *TreeNode, input []string, initial bool) []*PinyinSearchV3Result {
-	result := make([]*PinyinSearchV3Result, 0)
+func PinyinSearch(found *TreeNode, input []string, initial bool) []*PinyinSearchResult {
+	result := make([]*PinyinSearchResult, 0)
 	if len(input) < 1 {
-		return []*PinyinSearchV3Result{}
+		return []*PinyinSearchResult{}
 	}
-	if len(found.LeaveNodes) < 1 && len(input) < 1 {
-		log.Println("no leave nodes")
-		return []*PinyinSearchV3Result{{found, []string{}}}
+	if len(found.LeafNodes) < 1 && len(input) < 1 {
+		return []*PinyinSearchResult{{found, []string{}}}
 	} else {
 		head := input[0]
-		var slots []string
+		var slots []int
 		if initial || len(input) == 1 {
+			if len(head) == 0 {
+				return result
+			}
 			slots = found.PinyinInitialSlot[head[0:1]]
 		} else {
 			slots = found.PinyinSlot[head]
 		}
-		checker := make(map[string]string)
+		checker := make(map[int]bool)
 		for _, slot := range slots {
-			if _, ok := checker[slot]; ok {
+			if checker[slot] {
 				//multiple pinyin case
 				continue
 			}
-			checker[slot] = slot
-			slotNode := found.LeaveNodes[util.Str2Int(slot)]
+			checker[slot] = true
+			slotNode := found.LeafNodes[slot]
 			for _, pinyin := range slotNode.PinyinData {
 				compareTo := head
 				if initial {
+					if len(compareTo) == 0 || len(pinyin) == 0 {
+						continue
+					}
 					compareTo = compareTo[0:1]
 					pinyin = pinyin[0:1]
 				}
 
 				if len(input) == 1 {
 					if strings.HasPrefix(pinyin, compareTo) {
-						result = append(result, &PinyinSearchV3Result{slotNode, []string{}})
+						result = append(result, &PinyinSearchResult{slotNode, []string{}})
 						break
 					}
 				} else {
 					if pinyin == compareTo {
-						temp := PinyinSearchV2(slotNode, input[1:], initial)
+						temp := PinyinSearch(slotNode, input[1:], initial)
 						result = append(result, temp...)
 						break
 					}
@@ -311,7 +343,7 @@ func PinyinSearchV2(found *TreeNode, input []string, initial bool) []*PinyinSear
 		}
 
 		if len(result) < 1 {
-			return []*PinyinSearchV3Result{{found, input}}
+			return []*PinyinSearchResult{{found, input}}
 		} else {
 			return result
 		}

@@ -1,24 +1,24 @@
 package sstree
 
 import (
-	"github.com/chrwhy/open-pinyin/parser"
-	"log"
-	"os"
-	"github.com/chrwhy/open-sstree/util"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/chrwhy/open-pinyin/parser"
+
+	"github.com/chrwhy/open-sstree/util"
 )
 
-func XCnPinyinSearch(forest *Forest, root *TreeNode, input []rune) []*PinyinSearchV3Result {
-	result := make([]*PinyinSearchV3Result, 0)
-	log.Println("internalXSearch root: ", root)
-	log.Println("internalXSearch input: ", string(input))
+func XCnPinyinSearch(forest *Forest, root *TreeNode, input []rune) []*PinyinSearchResult {
+	result := make([]*PinyinSearchResult, 0)
+	slog.Debug("XCnPinyinSearch", "root", root, "input", string(input))
 	leftover := input
 	root, leftover = XCnSearch(forest, root, input)
 
 	if len(leftover) == 0 {
-		result = append(result, &PinyinSearchV3Result{root, nil})
+		result = append(result, &PinyinSearchResult{root, nil})
 		return result
 	}
 
@@ -29,31 +29,30 @@ func XCnPinyinSearch(forest *Forest, root *TreeNode, input []rune) []*PinyinSear
 			if len(pinyinGroup) == 1 {
 				candidates = GetPinyinPrefixRootNodeFromForest(forest, pinyinGroup[0])
 				for _, candidate := range candidates {
-					result = append(result, &PinyinSearchV3Result{candidate, nil})
+					result = append(result, &PinyinSearchResult{candidate, nil})
 				}
 			} else {
 				candidates = GetPinyinRootNodeFromForest(forest, pinyinGroup[0])
 				for _, candidate := range candidates {
-					temp := XPinyinSearchV2(forest, candidate, "", pinyinGroup[1:])
+					temp := XPinyinSearch(forest, candidate, "", pinyinGroup[1:])
 					result = append(result, temp...)
 				}
 			}
 		}
 	} else {
-		searchResult := XPinyinSearchV2(forest, root, string(leftover), nil)
+		searchResult := XPinyinSearch(forest, root, string(leftover), nil)
 		result = append(result, searchResult...)
 	}
 
 	return result
 }
 
-func XPinyinSearchV2(forest *Forest, root *TreeNode, leftover string, parsedPinyinGroup []string) []*PinyinSearchV3Result {
-	result := make([]*PinyinSearchV3Result, 0)
-	log.Println("stop node: ", root.Data)
-	log.Println("leftover: ", leftover)
+func XPinyinSearch(forest *Forest, root *TreeNode, leftover string, parsedPinyinGroup []string) []*PinyinSearchResult {
+	result := make([]*PinyinSearchResult, 0)
+	slog.Debug("XPinyinSearch", "stopNode", root.Data, "leftover", leftover)
 
 	if len(leftover) < 1 && len(parsedPinyinGroup) == 0 {
-		result = append(result, &PinyinSearchV3Result{root, nil})
+		result = append(result, &PinyinSearchResult{root, nil})
 		return result
 	}
 
@@ -64,34 +63,32 @@ func XPinyinSearchV2(forest *Forest, root *TreeNode, leftover string, parsedPiny
 		pinyinGroups = ParsePinyin(leftover)
 	}
 
-	log.Println("pinyin groups:", pinyinGroups)
-	checker := make(map[string]string)
+	slog.Debug("XPinyinSearch", "pinyinGroups", pinyinGroups)
+	checker := make(map[string]bool)
 	for _, pinyinGroup := range pinyinGroups {
-		if _, ok := checker[pinyinGroup[0]]; ok {
-			//continue
+		if checker[pinyinGroup[0]] {
+			continue
 		}
-		log.Println("===============")
-		log.Println("pinyin group:", pinyinGroup)
-		v3PinyinSearchCandidates := PinyinSearchV2(root, pinyinGroup, false)
-		log.Println("PinyinSearchV2 result len: ", len(v3PinyinSearchCandidates))
+		slog.Debug("XPinyinSearch", "pinyinGroup", pinyinGroup)
+		v3PinyinSearchCandidates := PinyinSearch(root, pinyinGroup, false)
+		slog.Debug("PinyinSearch", "resultLen", len(v3PinyinSearchCandidates))
 		if len(v3PinyinSearchCandidates) < 1 {
-			checker[pinyinGroup[0]] = pinyinGroup[0]
+			checker[pinyinGroup[0]] = true
 		}
 
 		for _, v3PinyinSearchCandidate := range v3PinyinSearchCandidates {
 			if len(v3PinyinSearchCandidate.Leftover) == len(pinyinGroup) {
-				checker[pinyinGroup[0]] = pinyinGroup[0]
+				checker[pinyinGroup[0]] = true
 			}
 			if len(v3PinyinSearchCandidate.Leftover) == 0 {
 				result = append(result, v3PinyinSearchCandidate)
 			} else {
-				log.Println("pinyin searched candidates: ", v3PinyinSearchCandidate.Node.Data)
+				slog.Debug("pinyin searched candidate", "data", v3PinyinSearchCandidate.Node.Data)
 				firstChar := v3PinyinSearchCandidate.Leftover[0][0:1]
-				slot := v3PinyinSearchCandidate.Node.CnSlot[firstChar]
-				if len(slot) > 0 {
-					node := v3PinyinSearchCandidate.Node.LeaveNodes[util.Str2Int(slot)]
+				if idx, ok := v3PinyinSearchCandidate.Node.CnSlot[firstChar]; ok {
+					node := v3PinyinSearchCandidate.Node.LeafNodes[idx]
 					tempResult := XCnPinyinSearch(forest, node, []rune(util.Concat(v3PinyinSearchCandidate.Leftover, "")[1:]))
-					log.Println(node.Data + "=====" + util.Concat(v3PinyinSearchCandidate.Leftover, ""))
+					slog.Debug("XCnPinyinSearch recursive", "data", node.Data, "leftover", util.Concat(v3PinyinSearchCandidate.Leftover, ""))
 					result = append(result, tempResult...)
 				}
 			}
@@ -103,6 +100,9 @@ func XPinyinSearchV2(forest *Forest, root *TreeNode, leftover string, parsedPiny
 
 func XSearch(forest *Forest, input string) []*TreeNode {
 	tokens := util.Tokenize([]rune(strings.ToLower(input)))
+	if len(tokens) == 0 {
+		return nil
+	}
 	candidates := internalXSearch(forest, nil, []rune(tokens[0]))
 	if len(candidates) == 0 {
 		return nil
@@ -129,37 +129,37 @@ func XSearch(forest *Forest, input string) []*TreeNode {
 }
 
 func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
+	if len(input) == 0 {
+		return nil
+	}
 	tokens := util.Tokenize(input)
 	if unicode.Is(unicode.Han, input[0]) {
 		root, leftover := XCnSearch(forest, root, []rune(tokens[0]))
-		log.Println("XCnSearch leftover: ", leftover)
+		slog.Debug("XCnSearch", "leftover", string(leftover))
 		if len(leftover) == 0 {
 			return []*TreeNode{root}
 		} else {
 			return nil
 		}
 	} else {
-		log.Println("internalXSearch:", string(input))
+		slog.Debug("internalXSearch", "input", string(input))
 		internalXSearchResult := XCnPinyinSearch(forest, root, input)
 
 		finalResult := make([]*TreeNode, 0)
-		finalResultChecker := make(map[*TreeNode]string)
+		finalResultChecker := make(map[*TreeNode]bool)
 		if len(internalXSearchResult) > 0 {
 			for _, internalXSearchCandidate := range internalXSearchResult {
-				log.Println("internalXSearch stop at: ", internalXSearchCandidate.Node.Data)
-				finalResult = append(finalResult, internalXSearchCandidate.Node)
-				finalResultChecker[internalXSearchCandidate.Node] = "1"
+				slog.Debug("internalXSearch stop at", "data", internalXSearchCandidate.Node.Data)
+				if !finalResultChecker[internalXSearchCandidate.Node] {
+					finalResult = append(finalResult, internalXSearchCandidate.Node)
+					finalResultChecker[internalXSearchCandidate.Node] = true
+				}
 			}
-			//return finalResult
-		}
-
-		if root != nil && len(internalXSearchResult) == 0 {
-			//return nil
 		}
 
 		pinyinGroups := ParsePinyin(string(input))
 		if len(pinyinGroups) > 0 {
-			log.Println("Going to try pure pinyin search: ", input)
+			slog.Debug("Going to try pure pinyin search", "input", string(input))
 			tempCache := make(map[string][]*TreeNode)
 			for _, pinyinGroup := range pinyinGroups {
 				candidates, ok := tempCache[pinyinGroup[0]]
@@ -172,10 +172,11 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 					tempCache[pinyinGroup[0]] = candidates
 				}
 				for _, candidate := range candidates {
-					purePinyinSearchCandidates := XPinyinSearchV2(forest, candidate, "", pinyinGroup[1:])
+					purePinyinSearchCandidates := XPinyinSearch(forest, candidate, "", pinyinGroup[1:])
 					for _, purePinyinSearchCandidate := range purePinyinSearchCandidates {
-						if _, kk := finalResultChecker[purePinyinSearchCandidate.Node]; !kk {
+						if !finalResultChecker[purePinyinSearchCandidate.Node] {
 							finalResult = append(finalResult, purePinyinSearchCandidate.Node)
+							finalResultChecker[purePinyinSearchCandidate.Node] = true
 						}
 					}
 				}
@@ -184,7 +185,7 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 
 		initials := parser.ParseInitial(string(input))
 		if len(initials) > 0 {
-			log.Println("Going to try initial pinyin search: ", input)
+			slog.Debug("Going to try initial pinyin search", "input", string(input))
 			leftInitials := initials
 			initialRoots := make([]*TreeNode, 0)
 			if root == nil {
@@ -198,12 +199,14 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 			}
 
 			for _, initialCandidate := range initialRoots {
-				initialPinyinSearchResult := PinyinSearchV2(initialCandidate, leftInitials, true)
+				initialPinyinSearchResult := PinyinSearch(initialCandidate, leftInitials, true)
 				for _, initialPinyinSearchCandidate := range initialPinyinSearchResult {
 					if len(initialPinyinSearchCandidate.Leftover) == 0 {
-						finalResult = append(finalResult, initialPinyinSearchCandidate.Node)
-						log.Println("Initial search stop node: ", initialPinyinSearchCandidate.Node.Data)
-						log.Println("Initial search leftover: ", initialPinyinSearchCandidate.Leftover)
+						if !finalResultChecker[initialPinyinSearchCandidate.Node] {
+							finalResult = append(finalResult, initialPinyinSearchCandidate.Node)
+							finalResultChecker[initialPinyinSearchCandidate.Node] = true
+						}
+						slog.Debug("Initial search stop", "data", initialPinyinSearchCandidate.Node.Data, "leftover", initialPinyinSearchCandidate.Leftover)
 					}
 				}
 			}
@@ -217,15 +220,13 @@ func XTraverse(candidates []*TreeNode) []string {
 	finalResult := make([]string, 0)
 	candidateChecker := make(map[*TreeNode]string)
 	t0 := time.Now()
-	log.SetOutput(os.Stderr)
-	log.Println("candidate len:", len(candidates))
+	slog.Info("XTraverse", "candidateLen", len(candidates))
 	if len(candidates) > 0 {
 		for _, candidate := range candidates {
 			parentPath, ok := candidateChecker[candidate]
 			if ok {
 				continue
 			}
-			suggestions := make([]string, 0)
 			if nil != candidate.Parent {
 				parentPath = util.Concat(ReverseTraverse(candidate), "")
 			} else {
@@ -233,33 +234,33 @@ func XTraverse(candidates []*TreeNode) []string {
 			}
 
 			candidateChecker[candidate] = parentPath
-			suggestions = Traverse(candidate, parentPath)
+			suggestions := Traverse(candidate, parentPath)
 			finalResult = append(finalResult, suggestions...)
 		}
 	}
-	log.Println("Traverse cost:", time.Since(t0))
+	slog.Info("XTraverse", "cost", time.Since(t0))
 	return finalResult
 }
 
 func XCnSearch(forest *Forest, root *TreeNode, input []rune) (*TreeNode, []rune) {
-	log.Println("internalXSearch start: ")
-	log.Println("root: ", root)
-	log.Println("input: ", string(input))
+	slog.Debug("XCnSearch", "root", root, "input", string(input))
 	leftover := input
+
+	if forest == nil {
+		return nil, input
+	}
 
 	if root == nil {
 		root = GetRootNodeFromForest(forest, string(input[0:1]))
 		if root != nil {
-			log.Println("root : ", root)
-			log.Println("leftover: ", leftover)
+			slog.Debug("XCnSearch found root", "root", root, "leftover", string(leftover))
 			leftover = input[1:]
 		}
 	}
 
 	if root != nil {
-		root, leftover = CnSearchV2(root, leftover)
-		log.Println("CnSearchV2 root : ", root)
-		log.Println("CnSearchV2 leftover: ", string(leftover))
+		root, leftover = CnSearch(root, leftover)
+		slog.Debug("CnSearch", "root", root, "leftover", string(leftover))
 	}
 
 	return root, leftover

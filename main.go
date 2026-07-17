@@ -2,28 +2,44 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
-	"github.com/chrwhy/open-sstree/tree"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/chrwhy/open-sstree/tree"
 )
 
 func main() {
+	dictDir := "."
+	if dir := os.Getenv("SSTREE_DICT_DIR"); dir != "" {
+		dictDir = dir
+	}
+
+	slog.Info("Initializing SSTree", "dictDir", dictDir)
+	engine, err := sstree.New(dictDir)
+	if err != nil {
+		slog.Error("Failed to initialize SSTree", "error", err)
+		os.Exit(1)
+	}
+
 	if len(os.Args) > 1 && strings.ToLower(os.Args[1]) == "web" {
-		web()
+		web(engine)
 	} else {
-		local()
+		local(engine)
 	}
 }
 
-func local() {
+func local(engine *sstree.SSTree) {
+	reader := bufio.NewReader(os.Stdin)
 	for {
-		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Please input: ")
 		keyword, _ := reader.ReadString('\n')
 		if len(keyword) < 1 {
@@ -31,22 +47,19 @@ func local() {
 		}
 
 		t0 := time.Now()
-		log.SetOutput(io.Discard)
-		candidates := sstree.Search(sstree.DEFAULT_FOREST, keyword)
+		candidates := engine.Search(sstree.DEFAULT_FOREST, keyword)
 		t1 := time.Now()
-		log.SetOutput(os.Stderr)
-		log.SetFlags(0)
-		log.Println("Search cost:", t1.Sub(t0))
+		slog.Info("Search completed", "cost", t1.Sub(t0), "candidates", len(candidates))
 		suggestions := sstree.XTraverse(candidates)
-		log.Println("Suggestions len:", len(suggestions))
+		slog.Info("Suggestions", "len", len(suggestions))
 		sstree.PrintSuggestions(suggestions)
-		t2 := time.Now()
-		log.Println("Total cost:", t2.Sub(t0))
+		slog.Info("Total", "cost", time.Since(t0))
 	}
 }
 
-func web() {
+func web(engine *sstree.SSTree) {
 	r := gin.Default()
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",
@@ -54,7 +67,14 @@ func web() {
 	})
 
 	r.GET("/reload", func(c *gin.Context) {
-		sstree.MultiLoad()
+		if err := engine.Reload(); err != nil {
+			slog.Error("Reload failed", "error", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code": -1,
+				"msg":  "reload failed: " + err.Error(),
+			})
+			return
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"code": 0,
 			"msg":  "success",
@@ -62,44 +82,57 @@ func web() {
 	})
 
 	r.GET("/search", func(c *gin.Context) {
-		log.Println("==========:", c.Query("keyword"))
 		keyword, _ := c.GetQuery("keyword")
 		keyword = strings.ToLower(keyword)
 		cate, _ := c.GetQuery("cate")
 		if len(cate) == 0 {
 			cate = "default"
 		}
-		log.Println("keyword:", keyword)
-		log.Println("cate:", cate)
 
-		log.SetOutput(io.Discard)
+		slog.Info("Search request", "keyword", keyword, "cate", cate)
+
 		t0 := time.Now()
-		result := sstree.Search(cate, keyword)
+		result := engine.Search(cate, keyword)
 		t1 := time.Now()
-		log.SetOutput(os.Stderr)
-		log.Println("Search cost:", t1.Sub(t0))
-		log.Println("Total records: ", len(result))
-		suggestions := make([]string, 0)
-		if len(result) > 100 {
-			suggestions = sstree.XTraverse(result[0:100])
-			log.Println("Suggestions len:", len(suggestions))
-		} else {
-			suggestions = sstree.XTraverse(result)
-			log.Println("Suggestions len:", len(suggestions))
-		}
+		slog.Info("Search completed", "cost", t1.Sub(t0), "totalRecords", len(result))
 
+		// Cap traversal at 100 candidates for performance
+		candidates := result
 		if len(result) > 100 {
-			c.JSON(http.StatusOK, gin.H{
-				"search_type": "",
-				"result":      suggestions,
-			})
-		} else {
-			c.JSON(http.StatusOK, gin.H{
-				"search_type": "",
-				"result":      suggestions,
-			})
+			candidates = result[0:100]
 		}
+		suggestions := sstree.XTraverse(candidates)
+		slog.Info("Suggestions", "len", len(suggestions))
+
+		c.JSON(http.StatusOK, gin.H{
+			"search_type": "",
+			"result":      suggestions,
+		})
 	})
 
-	r.Run(":8081")
+	srv := &http.Server{
+		Addr:    ":8081",
+		Handler: r,
+	}
+
+	// Graceful shutdown
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		sig := <-sigCh
+		slog.Info("Received signal, shutting down", "signal", sig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			slog.Error("Server shutdown error", "error", err)
+		}
+	}()
+
+	slog.Info("Starting server", "addr", ":8081")
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Error("Server error", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("Server stopped")
 }
