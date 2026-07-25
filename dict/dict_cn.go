@@ -64,15 +64,15 @@ func LoadSentences(fileName string) ([]Sentence, error) {
 		counter++
 		sentence = StripLine([]rune(sentence))
 		score := 0
-		if strings.Contains(sentence, "@") {
-			scoreStr := strings.Split(sentence, "@")[1]
+		if strings.Contains(sentence, "|") {
+			scoreStr := strings.Split(sentence, "|")[1]
 			s, err := util.Str2Int(scoreStr)
 			if err != nil {
 				slog.Warn("invalid score in dict, using 0", "file", fileName, "value", scoreStr, "error", err)
 			} else {
 				score = s
 			}
-			sentence = strings.Split(sentence, "@")[0]
+			sentence = strings.Split(sentence, "|")[0]
 		}
 		score++
 		sentencesDuplicateChecker[sentence] = "1"

@@ -104,9 +104,15 @@ func web(engine *sstree.SSTree) {
 		suggestions := sstree.XTraverse(candidates)
 		slog.Info("Suggestions", "len", len(suggestions))
 
+		// Extract text strings for API response
+		resultTexts := make([]string, len(suggestions))
+		for i, s := range suggestions {
+			resultTexts[i] = s.Text
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"search_type": "",
-			"result":      suggestions,
+			"result":      resultTexts,
 		})
 	})
 

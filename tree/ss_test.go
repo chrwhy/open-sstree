@@ -132,7 +132,7 @@ func TestSSTree_Search_WithResults(t *testing.T) {
 	suggestions := XTraverse(result)
 	found := false
 	for _, s := range suggestions {
-		if s == "今天" || s == "今天天气" {
+		if s.Text == "今天" || s.Text == "今天天气" {
 			found = true
 			break
 		}

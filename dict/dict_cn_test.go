@@ -31,7 +31,7 @@ func TestStripLine(t *testing.T) {
 
 func TestLoadSentences(t *testing.T) {
 	// Create a temporary dict file
-	content := "今天\n明天\n李白醉不醒@100\n音乐[yue]节\n人工\n人工控制\n"
+	content := "今天\n明天\n李白醉不醒|100\n音乐[yue]节\n人工\n人工控制\n"
 	tmpFile, err := os.CreateTemp("", "test*.dict")
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func TestLoadSentences(t *testing.T) {
 }
 
 func TestLoadSentences_ScoreParsing(t *testing.T) {
-	content := "李白醉不醒@100\n普通词\n"
+	content := "李白醉不醒|100\n普通词\n"
 	tmpFile, err := os.CreateTemp("", "test_score*.dict")
 	if err != nil {
 		t.Fatal(err)

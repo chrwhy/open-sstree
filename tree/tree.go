@@ -1,6 +1,7 @@
 package sstree
 
 import (
+	"container/heap"
 	"log/slog"
 	"strings"
 	"time"
@@ -28,6 +29,29 @@ type Forest struct {
 	PinyinInitialSlot map[string][]int
 	CnSlot            map[string]int
 }
+
+// Suggestion represents a search suggestion with its score.
+type Suggestion struct {
+	Text  string
+	Score int
+}
+
+// suggestionHeap implements a min-heap of Suggestion, ordered by Score.
+type suggestionHeap []Suggestion
+
+func (h suggestionHeap) Len() int            { return len(h) }
+func (h suggestionHeap) Less(i, j int) bool  { return h[i].Score < h[j].Score }
+func (h suggestionHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }
+func (h *suggestionHeap) Push(x interface{}) { *h = append(*h, x.(Suggestion)) }
+func (h *suggestionHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[:n-1]
+	return x
+}
+
+const MaxSuggestions = 20
 
 func BuildForest(input []dict.Sentence) *Forest {
 	t0 := time.Now()
@@ -254,6 +278,29 @@ func Traverse(node *TreeNode, prefix string) []string {
 	}
 
 	return result
+}
+
+// TraverseTopK traverses the tree and collects top-K suggestions using a min-heap with pruning.
+// node.Score is the maximum score in the subtree (guaranteed by internalBuildTree's max logic).
+// When the heap is full and node.Score <= heap minimum, the entire subtree is skipped.
+func TraverseTopK(node *TreeNode, prefix string, h *suggestionHeap) {
+	// Pruning: heap is full and subtree max score <= heap min → skip entire subtree
+	if h.Len() >= MaxSuggestions && node.Score <= (*h)[0].Score {
+		return
+	}
+
+	if node.IsBlack {
+		if h.Len() < MaxSuggestions {
+			heap.Push(h, Suggestion{Text: prefix, Score: node.Score})
+		} else if node.Score > (*h)[0].Score {
+			heap.Pop(h)
+			heap.Push(h, Suggestion{Text: prefix, Score: node.Score})
+		}
+	}
+
+	for _, leaf := range node.LeafNodes {
+		TraverseTopK(leaf, prefix+leaf.Data, h)
+	}
 }
 
 func ReverseTraverse(node *TreeNode) []string {

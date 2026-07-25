@@ -15,20 +15,16 @@ func PreProcess(input string) string {
 	return strings.ToLower(strings.Replace(strings.TrimSpace(input), "'", "", -1))
 }
 
-// PrintSuggestions prints unique suggestions up to maxResults.
-// Returns the number of unique suggestions printed.
-func PrintSuggestions(suggestions []string) int {
-	checker := make(map[string]bool)
+// PrintSuggestions prints suggestions with scores (already sorted by score descending).
+// Returns the number of suggestions printed.
+func PrintSuggestions(suggestions []Suggestion) int {
 	count := 0
-	for _, suggestion := range suggestions {
-		if !checker[suggestion] {
-			if count >= 20 {
-				break
-			}
-			checker[suggestion] = true
-			count++
-			slog.Info("建议", "suggestion", suggestion)
+	for _, s := range suggestions {
+		if count >= 20 {
+			break
 		}
+		count++
+		slog.Info("建议", "suggestion", s.Text, "score", s.Score)
 	}
 	return count
 }

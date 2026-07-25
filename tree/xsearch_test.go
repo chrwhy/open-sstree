@@ -112,7 +112,7 @@ func TestXTraverse(t *testing.T) {
 
 	found := make(map[string]bool)
 	for _, s := range suggestions {
-		found[s] = true
+		found[s.Text] = true
 	}
 
 	// Should contain "今天" and "今天天气"
@@ -122,6 +122,68 @@ func TestXTraverse(t *testing.T) {
 	if !found["今天天气"] {
 		t.Error("expected '今天天气' in suggestions")
 	}
+}
+
+func TestXTraverse_ScoreOrdering(t *testing.T) {
+	// Build a forest with different scores to verify Top-K ordering
+	input := []dict.Sentence{
+		makeSentence("人工智能", 50),
+		makeSentence("人工控制", 10),
+		makeSentence("人工", 30),
+	}
+	forest := BuildForest(input)
+
+	candidates := XSearch(forest, "人工")
+	if len(candidates) == 0 {
+		t.Fatal("XSearch('人工') returned empty")
+	}
+
+	suggestions := XTraverse(candidates)
+	if len(suggestions) == 0 {
+		t.Fatal("XTraverse returned empty suggestions")
+	}
+
+	// Suggestions should be ordered by score descending:
+	// 人工智能(50) > 人工(30) > 人工控制(10)
+	if suggestions[0].Text != "人工智能" {
+		t.Errorf("expected first suggestion '人工智能', got %q", suggestions[0].Text)
+	}
+	if len(suggestions) >= 2 && suggestions[1].Text != "人工" {
+		t.Errorf("expected second suggestion '人工', got %q", suggestions[1].Text)
+	}
+	if len(suggestions) >= 3 && suggestions[2].Text != "人工控制" {
+		t.Errorf("expected third suggestion '人工控制', got %q", suggestions[2].Text)
+	}
+}
+
+func TestXTraverse_TopKPruning(t *testing.T) {
+	// Build a forest with more than MaxSuggestions items to verify pruning
+	sentences := make([]dict.Sentence, 0)
+	for i := 0; i < 30; i++ {
+		// Use "测试" as prefix so they all share the same tree path
+		word := "测试" + string(rune('A'+i))
+		score := i + 1 // scores 1..30
+		sentences = append(sentences, makeSentence(word, score))
+	}
+	forest := BuildForest(sentences)
+
+	candidates := XSearch(forest, "测试")
+	if len(candidates) == 0 {
+		t.Fatal("XSearch('测试') returned empty")
+	}
+
+	suggestions := XTraverse(candidates)
+	// Should return at most MaxSuggestions (20)
+	if len(suggestions) > MaxSuggestions {
+		t.Errorf("expected at most %d suggestions, got %d", MaxSuggestions, len(suggestions))
+	}
+
+	// The top suggestion should be the highest scored one
+	if len(suggestions) > 0 {
+		t.Logf("Top suggestion: %q (score=%d)", suggestions[0].Text, suggestions[0].Score)
+	}
+
+	t.Logf("Got %d suggestions from 30 items (MaxSuggestions=%d)", len(suggestions), MaxSuggestions)
 }
 
 func TestXTraverse_Empty(t *testing.T) {

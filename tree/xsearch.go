@@ -1,6 +1,7 @@
 package sstree
 
 import (
+	"container/heap"
 	"log/slog"
 	"strings"
 	"time"
@@ -216,30 +217,36 @@ func internalXSearch(forest *Forest, root *TreeNode, input []rune) []*TreeNode {
 	}
 }
 
-func XTraverse(candidates []*TreeNode) []string {
-	finalResult := make([]string, 0)
-	candidateChecker := make(map[*TreeNode]string)
+func XTraverse(candidates []*TreeNode) []Suggestion {
+	h := &suggestionHeap{}
+	heap.Init(h)
+	candidateChecker := make(map[*TreeNode]bool)
 	t0 := time.Now()
 	slog.Info("XTraverse", "candidateLen", len(candidates))
-	if len(candidates) > 0 {
-		for _, candidate := range candidates {
-			parentPath, ok := candidateChecker[candidate]
-			if ok {
-				continue
-			}
-			if nil != candidate.Parent {
-				parentPath = util.Concat(ReverseTraverse(candidate), "")
-			} else {
-				parentPath = candidate.Data
-			}
 
-			candidateChecker[candidate] = parentPath
-			suggestions := Traverse(candidate, parentPath)
-			finalResult = append(finalResult, suggestions...)
+	for _, candidate := range candidates {
+		if candidateChecker[candidate] {
+			continue
 		}
+		candidateChecker[candidate] = true
+
+		var parentPath string
+		if candidate.Parent != nil {
+			parentPath = util.Concat(ReverseTraverse(candidate), "")
+		} else {
+			parentPath = candidate.Data
+		}
+		TraverseTopK(candidate, parentPath, h)
 	}
-	slog.Info("XTraverse", "cost", time.Since(t0))
-	return finalResult
+
+	// Extract from heap in descending score order
+	results := make([]Suggestion, h.Len())
+	for i := h.Len() - 1; i >= 0; i-- {
+		results[i] = heap.Pop(h).(Suggestion)
+	}
+
+	slog.Info("XTraverse", "cost", time.Since(t0), "topK", len(results))
+	return results
 }
 
 func XCnSearch(forest *Forest, root *TreeNode, input []rune) (*TreeNode, []rune) {
