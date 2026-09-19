@@ -3,7 +3,7 @@ module github.com/chrwhy/open-sstree
 go 1.21
 
 require (
-	github.com/chrwhy/open-pinyin v1.0.2
+	github.com/chrwhy/open-pinyin v1.0.3
 	github.com/gin-gonic/gin v1.9.1
 )
 
